@@ -1,0 +1,1263 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Scatter, AreaChart, Area } from 'recharts';
+import { ChevronUp, ChevronDown, Search, TrendingUp, TrendingDown, Eye, EyeOff, Plus, Minus, Clock, DollarSign, Target, Bell, Settings, LogOut, AlertCircle, Info } from 'lucide-react';
+
+export default function StockMarketSimulatorPRO() {
+  // Auth State
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authMode, setAuthMode] = useState('login'); // login, register
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+
+  // Game State
+  const [stocks, setStocks] = useState({});
+  const [stockHistory, setStockHistory] = useState({});
+  const [portfolio, setPortfolio] = useState({});
+  const [balance, setBalance] = useState(100000);
+  const [watchlist, setWatchlist] = useState(['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN']);
+  const [selectedStock, setSelectedStock] = useState('AAPL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showBuyModal, setShowBuyModal] = useState(false);
+  const [buyQuantity, setBuyQuantity] = useState(1);
+  const [orderHistory, setOrderHistory] = useState([]);
+  const [activeTab, setActiveTab] = useState('market');
+  const [timeframe, setTimeframe] = useState('1D');
+  const [sortBy, setSortBy] = useState('change');
+  const [chartType, setChartType] = useState('area');
+  const [showTechnical, setShowTechnical] = useState(true);
+  const [orderType, setOrderType] = useState('market');
+  const [limitPrice, setLimitPrice] = useState('');
+  const [alerts, setAlerts] = useState([]);
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [alertPrice, setAlertPrice] = useState('');
+  const [alertType, setAlertType] = useState('above');
+  const [sector, setSector] = useState('all');
+  const [priceRange, setPriceRange] = useState({ min: 0, max: 5000 });
+
+  const allStocks = {
+    // Technology
+    'AAPL': { name: 'Apple Inc.', price: 192.45, basePrice: 192.45, change: 0, volume: 52234567, pe: 28.5, market_cap: '2.98T', eps: 6.05, dividend: 0.94, sector: 'Technology', industry: 'Consumer Electronics', dayHigh: 195, dayLow: 190, week52High: 215, week52Low: 155, avgVolume: 50000000, marketOpen: 190.2 },
+    'GOOGL': { name: 'Alphabet Inc.', price: 138.75, basePrice: 138.75, change: 0, volume: 21345678, pe: 24.3, market_cap: '1.82T', eps: 5.71, dividend: 0, sector: 'Technology', industry: 'Internet Services', dayHigh: 140, dayLow: 136, week52High: 155, week52Low: 95, avgVolume: 25000000, marketOpen: 137.5 },
+    'MSFT': { name: 'Microsoft Corp.', price: 375.92, basePrice: 375.92, change: 0, volume: 19876543, pe: 35.2, market_cap: '2.80T', eps: 10.65, dividend: 2.72, sector: 'Technology', industry: 'Software', dayHigh: 380, dayLow: 370, week52High: 420, week52Low: 310, avgVolume: 20000000, marketOpen: 373.2 },
+    'NVDA': { name: 'NVIDIA Corp.', price: 875.28, basePrice: 875.28, change: 0, volume: 38765432, pe: 68.4, market_cap: '2.16T', eps: 12.78, dividend: 0.04, sector: 'Technology', industry: 'Semiconductors', dayHigh: 890, dayLow: 860, week52High: 950, week52Low: 420, avgVolume: 35000000, marketOpen: 870.5 },
+    'META': { name: 'Meta Platforms', price: 498.34, basePrice: 498.34, change: 0, volume: 12345678, pe: 22.1, market_cap: '1.27T', eps: 22.54, dividend: 0, sector: 'Technology', industry: 'Internet Services', dayHigh: 510, dayLow: 485, week52High: 540, week52Low: 350, avgVolume: 15000000, marketOpen: 495.2 },
+    'INTC': { name: 'Intel Corp.', price: 41.82, basePrice: 41.82, change: 0, volume: 45123456, pe: 12.5, market_cap: '175B', eps: 3.34, dividend: 1.40, sector: 'Technology', industry: 'Semiconductors', dayHigh: 43, dayLow: 40, week52High: 52, week52Low: 28, avgVolume: 42000000, marketOpen: 41.5 },
+    'AMD': { name: 'Advanced Micro Devices', price: 168.45, basePrice: 168.45, change: 0, volume: 28765432, pe: 35.2, market_cap: '172B', eps: 4.78, dividend: 0, sector: 'Technology', industry: 'Semiconductors', dayHigh: 171, dayLow: 165, week52High: 192, week52Low: 85, avgVolume: 27000000, marketOpen: 167.2 },
+    'TSMC': { name: 'Taiwan Semiconductor', price: 120.56, basePrice: 120.56, change: 0, volume: 32145678, pe: 18.9, market_cap: '1.26T', eps: 6.38, dividend: 1.70, sector: 'Technology', industry: 'Semiconductors', dayHigh: 122, dayLow: 119, week52High: 140, week52Low: 60, avgVolume: 30000000, marketOpen: 120.1 },
+    'CRM': { name: 'Salesforce', price: 265.78, basePrice: 265.78, change: 0, volume: 8765432, pe: 28.5, market_cap: '266B', eps: 9.32, dividend: 0, sector: 'Technology', industry: 'Software', dayHigh: 270, dayLow: 260, week52High: 310, week52Low: 180, avgVolume: 8200000, marketOpen: 264.5 },
+    
+    // Automotive & Energy
+    'TSLA': { name: 'Tesla Inc.', price: 242.84, basePrice: 242.84, change: 0, volume: 127654321, pe: 58.9, market_cap: '770B', eps: 4.07, dividend: 0, sector: 'Automotive', industry: 'Auto Manufacturing', dayHigh: 250, dayLow: 235, week52High: 280, week52Low: 140, avgVolume: 120000000, marketOpen: 240.1 },
+    'TM': { name: 'Toyota Motor', price: 195.32, basePrice: 195.32, change: 0, volume: 2345678, pe: 9.8, market_cap: '295B', eps: 19.91, dividend: 4.40, sector: 'Automotive', industry: 'Auto Manufacturing', dayHigh: 198, dayLow: 192, week52High: 240, week52Low: 150, avgVolume: 2100000, marketOpen: 194.5 },
+    'GM': { name: 'General Motors', price: 42.15, basePrice: 42.15, change: 0, volume: 18765432, pe: 5.2, market_cap: '60B', eps: 8.10, dividend: 2.00, sector: 'Automotive', industry: 'Auto Manufacturing', dayHigh: 43, dayLow: 41, week52High: 58, week52Low: 28, avgVolume: 17500000, marketOpen: 42.0 },
+    'F': { name: 'Ford Motor', price: 10.25, basePrice: 10.25, change: 0, volume: 78945321, pe: 6.8, market_cap: '41B', eps: 1.51, dividend: 0.60, sector: 'Automotive', industry: 'Auto Manufacturing', dayHigh: 11, dayLow: 10, week52High: 14, week52Low: 6, avgVolume: 75000000, marketOpen: 10.2 },
+    'XOM': { name: 'Exxon Mobil', price: 105.42, basePrice: 105.42, change: 0, volume: 25643210, pe: 11.2, market_cap: '440B', eps: 9.41, dividend: 3.48, sector: 'Energy', industry: 'Oil & Gas', dayHigh: 107, dayLow: 104, week52High: 125, week52Low: 65, avgVolume: 24000000, marketOpen: 104.8 },
+    'CVX': { name: 'Chevron Corp.', price: 156.78, basePrice: 156.78, change: 0, volume: 8945321, pe: 13.5, market_cap: '308B', eps: 11.61, dividend: 5.84, sector: 'Energy', industry: 'Oil & Gas', dayHigh: 159, dayLow: 155, week52High: 195, week52Low: 95, avgVolume: 8200000, marketOpen: 156.2 },
+    
+    // E-Commerce & Retail
+    'AMZN': { name: 'Amazon.com Inc.', price: 180.56, basePrice: 180.56, change: 0, volume: 45678901, pe: 45.6, market_cap: '1.87T', eps: 3.96, dividend: 0, sector: 'Consumer Cyclical', industry: 'Internet Retail', dayHigh: 185, dayLow: 175, week52High: 210, week52Low: 130, avgVolume: 42000000, marketOpen: 178.5 },
+    'WMT': { name: 'Walmart Inc.', price: 92.45, basePrice: 92.45, change: 0, volume: 6234567, pe: 26.8, market_cap: '248B', eps: 3.45, dividend: 1.96, sector: 'Consumer Cyclical', industry: 'Retail', dayHigh: 94, dayLow: 90, week52High: 98, week52Low: 68, avgVolume: 5800000, marketOpen: 91.8 },
+    'COST': { name: 'Costco Wholesale', price: 825.12, basePrice: 825.12, change: 0, volume: 1765432, pe: 48.5, market_cap: '365B', eps: 17.01, dividend: 2.04, sector: 'Consumer Cyclical', industry: 'Retail', dayHigh: 835, dayLow: 815, week52High: 870, week52Low: 540, avgVolume: 1600000, marketOpen: 823.5 },
+    'EBAY': { name: 'eBay Inc.', price: 38.95, basePrice: 38.95, change: 0, volume: 8234567, pe: 5.2, market_cap: '22B', eps: 7.47, dividend: 2.20, sector: 'Consumer Cyclical', industry: 'Internet Retail', dayHigh: 40, dayLow: 37, week52High: 64, week52Low: 30, avgVolume: 7900000, marketOpen: 38.5 },
+    
+    // Financial Services
+    'JPM': { name: 'JPMorgan Chase', price: 198.45, basePrice: 198.45, change: 0, volume: 12543210, pe: 13.2, market_cap: '561B', eps: 15.05, dividend: 4.00, sector: 'Finance', industry: 'Banking', dayHigh: 200, dayLow: 196, week52High: 215, week52Low: 120, avgVolume: 11900000, marketOpen: 197.8 },
+    'BAC': { name: 'Bank of America', price: 32.12, basePrice: 32.12, change: 0, volume: 52345678, pe: 9.8, market_cap: '300B', eps: 3.28, dividend: 0.93, sector: 'Finance', industry: 'Banking', dayHigh: 33, dayLow: 31, week52High: 41, week52Low: 22, avgVolume: 50000000, marketOpen: 31.9 },
+    'WFC': { name: 'Wells Fargo', price: 63.45, basePrice: 63.45, change: 0, volume: 18765432, pe: 12.5, market_cap: '260B', eps: 5.08, dividend: 2.04, sector: 'Finance', industry: 'Banking', dayHigh: 65, dayLow: 62, week52High: 75, week52Low: 40, avgVolume: 18000000, marketOpen: 63.1 },
+    'GS': { name: 'Goldman Sachs', price: 376.82, basePrice: 376.82, change: 0, volume: 1834567, pe: 10.2, market_cap: '130B', eps: 36.95, dividend: 10.00, sector: 'Finance', industry: 'Investment Bank', dayHigh: 380, dayLow: 373, week52High: 480, week52Low: 290, avgVolume: 1700000, marketOpen: 376.2 },
+    'BRK.B': { name: 'Berkshire Hathaway', price: 395.65, basePrice: 395.65, change: 0, volume: 3456789, pe: 13.8, market_cap: '828B', eps: 28.66, dividend: 0, sector: 'Finance', industry: 'Insurance', dayHigh: 398, dayLow: 392, week52High: 420, week52Low: 280, avgVolume: 3200000, marketOpen: 394.8 },
+    
+    // Healthcare & Pharma
+    'JNJ': { name: 'Johnson & Johnson', price: 156.78, basePrice: 156.78, change: 0, volume: 4234567, pe: 24.2, market_cap: '412B', eps: 6.48, dividend: 4.60, sector: 'Healthcare', industry: 'Pharmaceuticals', dayHigh: 159, dayLow: 155, week52High: 175, week52Low: 110, avgVolume: 4000000, marketOpen: 156.2 },
+    'UNH': { name: 'UnitedHealth Group', price: 515.92, basePrice: 515.92, change: 0, volume: 2134567, pe: 28.5, market_cap: '486B', eps: 18.08, dividend: 2.10, sector: 'Healthcare', industry: 'Healthcare Services', dayHigh: 520, dayLow: 510, week52High: 610, week52Low: 340, avgVolume: 2000000, marketOpen: 514.5 },
+    'PFE': { name: 'Pfizer Inc.', price: 26.45, basePrice: 26.45, change: 0, volume: 32145678, pe: 13.2, market_cap: '150B', eps: 2.00, dividend: 1.60, sector: 'Healthcare', industry: 'Pharmaceuticals', dayHigh: 27, dayLow: 26, week52High: 35, week52Low: 18, avgVolume: 31000000, marketOpen: 26.3 },
+    'ABBV': { name: 'AbbVie Inc.', price: 159.45, basePrice: 159.45, change: 0, volume: 8765432, pe: 10.8, market_cap: '282B', eps: 14.76, dividend: 6.04, sector: 'Healthcare', industry: 'Pharmaceuticals', dayHigh: 161, dayLow: 158, week52High: 180, week52Low: 95, avgVolume: 8400000, marketOpen: 158.9 },
+    'AMGN': { name: 'Amgen Inc.', price: 303.45, basePrice: 303.45, change: 0, volume: 2654321, pe: 18.5, market_cap: '193B', eps: 16.38, dividend: 6.76, sector: 'Healthcare', industry: 'Biotechnology', dayHigh: 306, dayLow: 300, week52High: 350, week52Low: 220, avgVolume: 2500000, marketOpen: 302.8 },
+    
+    // Entertainment & Media
+    'NFLX': { name: 'Netflix Inc.', price: 445.92, basePrice: 445.92, change: 0, volume: 3456789, pe: 35.8, market_cap: '192B', eps: 12.44, dividend: 0, sector: 'Communication Services', industry: 'Entertainment', dayHigh: 460, dayLow: 430, week52High: 500, week52Low: 300, avgVolume: 3200000, marketOpen: 442.1 },
+    'DIS': { name: 'Disney Inc.', price: 92.15, basePrice: 92.15, change: 0, volume: 12345678, pe: 22.5, market_cap: '168B', eps: 4.09, dividend: 0.99, sector: 'Communication Services', industry: 'Entertainment', dayHigh: 94, dayLow: 90, week52High: 123, week52Low: 78, avgVolume: 12000000, marketOpen: 91.5 },
+    'PARA': { name: 'Paramount Global', price: 16.78, basePrice: 16.78, change: 0, volume: 28765432, pe: 4.2, market_cap: '11B', eps: 4.00, dividend: 1.20, sector: 'Communication Services', industry: 'Entertainment', dayHigh: 17, dayLow: 16, week52High: 28, week52Low: 10, avgVolume: 27500000, marketOpen: 16.5 },
+    
+    // Utilities
+    'NEE': { name: 'NextEra Energy', price: 78.45, basePrice: 78.45, change: 0, volume: 8934567, pe: 21.5, market_cap: '153B', eps: 3.65, dividend: 2.36, sector: 'Utilities', industry: 'Electric Utilities', dayHigh: 80, dayLow: 77, week52High: 92, week52Low: 45, avgVolume: 8600000, marketOpen: 78.1 },
+    'DUK': { name: 'Duke Energy', price: 108.25, basePrice: 108.25, change: 0, volume: 2345678, pe: 18.2, market_cap: '80B', eps: 5.95, dividend: 4.00, sector: 'Utilities', industry: 'Electric Utilities', dayHigh: 110, dayLow: 107, week52High: 125, week52Low: 75, avgVolume: 2200000, marketOpen: 107.8 },
+    
+    // Real Estate
+    'PLD': { name: 'Prologis Inc.', price: 128.65, basePrice: 128.65, change: 0, volume: 2145678, pe: 16.8, market_cap: '96B', eps: 7.67, dividend: 3.40, sector: 'Real Estate', industry: 'REIT', dayHigh: 131, dayLow: 127, week52High: 152, week52Low: 85, avgVolume: 2000000, marketOpen: 128.2 },
+    'SPG': { name: 'Simon Property', price: 182.45, basePrice: 182.45, change: 0, volume: 1765432, pe: 12.5, market_cap: '59B', eps: 14.60, dividend: 6.20, sector: 'Real Estate', industry: 'REIT', dayHigh: 185, dayLow: 180, week52High: 215, week52Low: 95, avgVolume: 1650000, marketOpen: 181.9 },
+    
+    // Materials & Mining
+    'NEM': { name: 'Newmont Corporation', price: 52.34, basePrice: 52.34, change: 0, volume: 8765432, pe: 15.2, market_cap: '42B', eps: 3.44, dividend: 0.92, sector: 'Materials', industry: 'Gold Mining', dayHigh: 54, dayLow: 51, week52High: 65, week52Low: 30, avgVolume: 8400000, marketOpen: 52.1 },
+    'FCX': { name: 'Freeport-McMoran', price: 35.78, basePrice: 35.78, change: 0, volume: 12345678, pe: 8.5, market_cap: '54B', eps: 4.20, dividend: 1.28, sector: 'Materials', industry: 'Copper Mining', dayHigh: 37, dayLow: 35, week52High: 50, week52Low: 18, avgVolume: 11900000, marketOpen: 35.5 },
+    
+    // Transportation
+    'AAL': { name: 'American Airlines', price: 14.25, basePrice: 14.25, change: 0, volume: 45123456, pe: 3.8, market_cap: '10B', eps: 3.76, dividend: 0, sector: 'Transportation', industry: 'Airlines', dayHigh: 15, dayLow: 14, week52High: 18, week52Low: 8, avgVolume: 43000000, marketOpen: 14.1 },
+    'UAL': { name: 'United Airlines', price: 21.45, basePrice: 21.45, change: 0, volume: 32145678, pe: 5.2, market_cap: '8B', eps: 4.12, dividend: 0, sector: 'Transportation', industry: 'Airlines', dayHigh: 22, dayLow: 21, week52High: 25, week52Low: 12, avgVolume: 31000000, marketOpen: 21.2 },
+  };
+
+  // Initialize stocks on mount
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  // Load user data from localStorage
+  const loadUserData = () => {
+    const users = JSON.parse(localStorage.getItem('apex_users') || '{}');
+    const loggedInUser = localStorage.getItem('apex_currentUser');
+
+    if (loggedInUser && users[loggedInUser]) {
+      const userData = users[loggedInUser];
+      setCurrentUser({ email: loggedInUser });
+      setIsLoggedIn(true);
+      
+      // Load game data
+      setStocks(userData.stocks || allStocks);
+      setStockHistory(userData.stockHistory || {});
+      setPortfolio(userData.portfolio || {});
+      setBalance(userData.balance || 100000);
+      setWatchlist(userData.watchlist || ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN']);
+      setOrderHistory(userData.orderHistory || []);
+      setAlerts(userData.alerts || []);
+      setSelectedStock(userData.selectedStock || 'AAPL');
+    } else {
+      setStocks(allStocks);
+      const history = {};
+      Object.keys(allStocks).forEach(symbol => {
+        history[symbol] = [{ time: new Date(), price: allStocks[symbol].price, volume: allStocks[symbol].volume }];
+      });
+      setStockHistory(history);
+    }
+  };
+
+  // Save user data to localStorage
+  const saveUserData = useCallback(() => {
+    if (!currentUser) return;
+
+    const users = JSON.parse(localStorage.getItem('apex_users') || '{}');
+    users[currentUser.email] = {
+      stocks,
+      stockHistory,
+      portfolio,
+      balance,
+      watchlist,
+      orderHistory,
+      alerts,
+      selectedStock
+    };
+    localStorage.setItem('apex_users', JSON.stringify(users));
+  }, [currentUser, stocks, stockHistory, portfolio, balance, watchlist, orderHistory, alerts, selectedStock]);
+
+  // Auto-save every time state changes
+  useEffect(() => {
+    if (isLoggedIn) {
+      saveUserData();
+    }
+  }, [balance, portfolio, orderHistory, alerts, watchlist, isLoggedIn, saveUserData]);
+
+  // Handle Login
+  const handleLogin = () => {
+    if (!authEmail || !authPassword) {
+      setAuthError('Email dan password harus diisi!');
+      return;
+    }
+
+    if (!authEmail.includes('@')) {
+      setAuthError('Format email tidak valid!');
+      return;
+    }
+
+    const users = JSON.parse(localStorage.getItem('apex_users') || '{}');
+
+    if (authMode === 'login') {
+      if (!users[authEmail]) {
+        setAuthError('Email tidak terdaftar!');
+        return;
+      }
+
+      if (users[authEmail].password !== authPassword) {
+        setAuthError('Password salah!');
+        return;
+      }
+
+      // Login sukses
+      localStorage.setItem('apex_currentUser', authEmail);
+      setCurrentUser({ email: authEmail });
+      setIsLoggedIn(true);
+      setAuthError('');
+
+      // Load user data
+      const userData = users[authEmail];
+      setStocks(userData.stocks || allStocks);
+      setStockHistory(userData.stockHistory || {});
+      setPortfolio(userData.portfolio || {});
+      setBalance(userData.balance || 100000);
+      setWatchlist(userData.watchlist || ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN']);
+      setOrderHistory(userData.orderHistory || []);
+      setAlerts(userData.alerts || []);
+    } else {
+      // Register
+      if (users[authEmail]) {
+        setAuthError('Email sudah terdaftar!');
+        return;
+      }
+
+      // Create new user
+      users[authEmail] = {
+        password: authPassword,
+        stocks: allStocks,
+        stockHistory: {},
+        portfolio: {},
+        balance: 100000,
+        watchlist: ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN'],
+        orderHistory: [],
+        alerts: [],
+        selectedStock: 'AAPL'
+      };
+
+      localStorage.setItem('apex_users', JSON.stringify(users));
+      localStorage.setItem('apex_currentUser', authEmail);
+      setCurrentUser({ email: authEmail });
+      setIsLoggedIn(true);
+      setAuthError('');
+
+      // Initialize new user's game
+      const history = {};
+      Object.keys(allStocks).forEach(symbol => {
+        history[symbol] = [{ time: new Date(), price: allStocks[symbol].price, volume: allStocks[symbol].volume }];
+      });
+      setStocks(allStocks);
+      setStockHistory(history);
+      setBalance(100000);
+      setPortfolio({});
+      setWatchlist(['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN']);
+    }
+
+    setAuthEmail('');
+    setAuthPassword('');
+  };
+
+  // Handle Logout
+  const handleLogout = () => {
+    localStorage.removeItem('apex_currentUser');
+    setIsLoggedIn(false);
+    setCurrentUser(null);
+    setAuthEmail('');
+    setAuthPassword('');
+    setAuthMode('login');
+    setAuthError('');
+  };
+
+  // Real-time price simulation
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    const interval = setInterval(() => {
+      setStocks(prevStocks => {
+        const updatedStocks = { ...prevStocks };
+        Object.keys(updatedStocks).forEach(symbol => {
+          const stock = updatedStocks[symbol];
+          const randomChange = (Math.random() - 0.5) * 2 * (stock.basePrice * 0.02);
+          const newPrice = Math.max(stock.basePrice * 0.5, stock.price + randomChange);
+          const changePercent = ((newPrice - stock.basePrice) / stock.basePrice) * 100;
+
+          updatedStocks[symbol] = {
+            ...stock,
+            price: parseFloat(newPrice.toFixed(2)),
+            change: parseFloat(changePercent.toFixed(2)),
+            volume: stock.volume + Math.floor(Math.random() * 100000),
+            dayHigh: Math.max(stock.dayHigh, newPrice),
+            dayLow: Math.min(stock.dayLow, newPrice),
+          };
+
+          setStockHistory(prev => ({
+            ...prev,
+            [symbol]: [
+              ...prev[symbol],
+              {
+                time: new Date(),
+                price: parseFloat(newPrice.toFixed(2)),
+                volume: stock.volume + Math.floor(Math.random() * 100000),
+              }
+            ].slice(-360)
+          }));
+        });
+        return updatedStocks;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isLoggedIn]);
+
+  const calculatePortfolioValue = () => {
+    return Object.entries(portfolio).reduce((acc, [symbol, quantity]) => {
+      return acc + (stocks[symbol]?.price || 0) * quantity;
+    }, 0);
+  };
+
+  const calculateTotalGain = () => {
+    let totalCost = 0;
+    orderHistory
+      .filter(order => order.type === 'BUY')
+      .forEach(order => {
+        totalCost += order.total;
+      });
+    const currentValue = calculatePortfolioValue() + balance;
+    return currentValue - 100000;
+  };
+
+  const toggleWatchlist = (symbol) => {
+    setWatchlist(prev =>
+      prev.includes(symbol)
+        ? prev.filter(s => s !== symbol)
+        : [...prev, symbol]
+    );
+  };
+
+  const handleBuyStock = () => {
+    const stock = stocks[selectedStock];
+    const buyPrice = orderType === 'limit' ? (parseFloat(limitPrice) || stock.price) : stock.price;
+    const totalCost = buyPrice * buyQuantity;
+
+    if (totalCost > balance) {
+      alert('Saldo tidak cukup!');
+      return;
+    }
+
+    setBalance(balance - totalCost);
+    setPortfolio({
+      ...portfolio,
+      [selectedStock]: (portfolio[selectedStock] || 0) + buyQuantity
+    });
+
+    setOrderHistory([
+      {
+        id: Date.now(),
+        symbol: selectedStock,
+        type: 'BUY',
+        orderType: orderType,
+        quantity: buyQuantity,
+        price: buyPrice,
+        total: totalCost,
+        timestamp: new Date().toLocaleString(),
+        status: 'FILLED'
+      },
+      ...orderHistory
+    ]);
+
+    setBuyQuantity(1);
+    setLimitPrice('');
+    setOrderType('market');
+    setShowBuyModal(false);
+  };
+
+  const handleAddAlert = () => {
+    if (alertPrice && alertPrice > 0) {
+      setAlerts([...alerts, {
+        id: Date.now(),
+        symbol: selectedStock,
+        price: parseFloat(alertPrice),
+        type: alertType,
+        triggered: false
+      }]);
+      setAlertPrice('');
+      setShowAlertModal(false);
+    }
+  };
+
+  const getChartData = useCallback(() => {
+    if (!stockHistory[selectedStock]) return [];
+    return stockHistory[selectedStock]
+      .map((item, idx) => ({
+        time: idx,
+        price: item.price,
+        volume: item.volume,
+      }))
+      .slice(-120);
+  }, [selectedStock, stockHistory]);
+
+  const filteredStocks = Object.entries(stocks)
+    .filter(([symbol, stock]) => {
+      const matchesSearch = symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        stock.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSector = sector === 'all' || stock.sector === sector;
+      const matchesPrice = stock.price >= priceRange.min && stock.price <= priceRange.max;
+      return matchesSearch && matchesSector && matchesPrice;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'change') return b[1].change - a[1].change;
+      if (sortBy === 'volume') return b[1].volume - a[1].volume;
+      if (sortBy === 'pe') return a[1].pe - b[1].pe;
+      return 0;
+    });
+
+  const selectedStockData = stocks[selectedStock];
+  const chartData = getChartData();
+  const sectors = ['all', ...new Set(Object.values(stocks).map(s => s.sector))];
+
+  // LOGIN SCREEN
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black text-white font-sans flex items-center justify-center p-4">
+        {/* Animated background */}
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
+        </div>
+
+        <div className="relative max-w-md w-full">
+          <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8">
+            <div className="text-center mb-8">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent mb-2">
+                APEX TRADING
+              </h1>
+              <p className="text-slate-400">Professional Stock Market Simulator</p>
+            </div>
+
+            <div className="space-y-6">
+              {/* Mode Selection */}
+              <div className="flex gap-2 bg-slate-700/30 p-1 rounded-lg">
+                <button
+                  onClick={() => {
+                    setAuthMode('login');
+                    setAuthError('');
+                  }}
+                  className={`flex-1 py-2 rounded font-semibold transition-all ${
+                    authMode === 'login'
+                      ? 'bg-cyan-500 text-white'
+                      : 'text-slate-400 hover:text-slate-300'
+                  }`}
+                >
+                  Login
+                </button>
+                <button
+                  onClick={() => {
+                    setAuthMode('register');
+                    setAuthError('');
+                  }}
+                  className={`flex-1 py-2 rounded font-semibold transition-all ${
+                    authMode === 'register'
+                      ? 'bg-cyan-500 text-white'
+                      : 'text-slate-400 hover:text-slate-300'
+                  }`}
+                >
+                  Register
+                </button>
+              </div>
+
+              {/* Error Message */}
+              {authError && (
+                <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 flex items-center gap-3">
+                  <AlertCircle size={20} className="text-red-400" />
+                  <p className="text-sm text-red-200">{authError}</p>
+                </div>
+              )}
+
+              {/* Input Fields */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Email</label>
+                  <input
+                    type="email"
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                    placeholder="user@example.com"
+                    className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Password</label>
+                  <input
+                    type="password"
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                    placeholder="••••••••"
+                    className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Login Button */}
+              <button
+                onClick={handleLogin}
+                className="w-full bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white font-bold py-3 rounded-lg transition-all transform hover:scale-105"
+              >
+                {authMode === 'login' ? 'Login' : 'Register & Play'}
+              </button>
+
+              {/* Demo Info */}
+              <div className="bg-slate-700/30 rounded-lg p-4 text-sm text-slate-300">
+                <p className="mb-2">📝 <strong>Demo Account:</strong></p>
+                <p className="text-xs">Email: demo@apex.com</p>
+                <p className="text-xs">Password: demo123</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // MAIN APP
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-black text-white font-sans">
+      {/* Animated background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
+      </div>
+
+      {/* Header */}
+      <header className="relative border-b border-slate-700/50 backdrop-blur-xl bg-slate-950/50 sticky top-0 z-40">
+        <div className="max-w-full mx-auto px-6 py-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                APEX TRADING PRO
+              </h1>
+              <p className="text-sm text-slate-400 mt-1">Professional Stock Market Simulator</p>
+            </div>
+            <div className="flex items-center gap-6">
+              <div className="text-right">
+                <p className="text-sm text-slate-400">Account Balance</p>
+                <p className="text-3xl font-bold text-cyan-400">${balance.toFixed(2)}</p>
+                <p className={`text-sm font-semibold mt-1 ${calculateTotalGain() >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {calculateTotalGain() >= 0 ? '+' : ''}{calculateTotalGain().toFixed(2)}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-slate-400">User</p>
+                <p className="text-lg font-bold">{currentUser?.email}</p>
+                <button
+                  onClick={handleLogout}
+                  className="text-red-400 hover:text-red-300 text-sm mt-1 flex items-center gap-1"
+                >
+                  <LogOut size={14} /> Logout
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Navigation Tabs */}
+          <div className="flex gap-4 border-b border-slate-700/50 overflow-x-auto">
+            {['market', 'portfolio', 'watchlist', 'screener', 'orders', 'alerts'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-3 font-semibold text-sm transition-all whitespace-nowrap ${
+                  activeTab === tab
+                    ? 'text-cyan-400 border-b-2 border-cyan-400'
+                    : 'text-slate-400 hover:text-slate-300'
+                }`}
+              >
+                {tab.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
+      </header>
+
+      <main className="relative max-w-full mx-auto px-6 py-8">
+        {/* Market Tab */}
+        {activeTab === 'market' && (
+          <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+            {/* Main Chart Area */}
+            <div className="xl:col-span-3 space-y-6">
+              {/* Stock Details Header */}
+              <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-xl p-6">
+                <div className="flex items-start justify-between mb-6">
+                  <div>
+                    <h2 className="text-3xl font-bold">{selectedStock}</h2>
+                    <p className="text-slate-400">{selectedStockData?.name}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => toggleWatchlist(selectedStock)}
+                      className="p-2 bg-slate-700/50 hover:bg-slate-700 rounded-lg transition-all"
+                    >
+                      {watchlist.includes(selectedStock) ? <Eye size={20} /> : <EyeOff size={20} />}
+                    </button>
+                    <button
+                      onClick={() => setShowAlertModal(true)}
+                      className="p-2 bg-slate-700/50 hover:bg-slate-700 rounded-lg transition-all"
+                    >
+                      <Bell size={20} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-end justify-between mb-6">
+                  <div>
+                    <p className="text-5xl font-bold text-cyan-400">${selectedStockData?.price}</p>
+                    <div className={`flex items-center gap-2 mt-2 ${selectedStockData?.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {selectedStockData?.change >= 0 ? <TrendingUp size={24} /> : <TrendingDown size={24} />}
+                      <span className="text-2xl font-semibold">{selectedStockData?.change > 0 ? '+' : ''}{selectedStockData?.change}%</span>
+                    </div>
+                  </div>
+                  <div className="text-right space-y-2 text-sm">
+                    <div><span className="text-slate-400">Range Hari:</span> <span className="font-bold">${selectedStockData?.dayLow} - ${selectedStockData?.dayHigh}</span></div>
+                    <div><span className="text-slate-400">52W Range:</span> <span className="font-bold">${selectedStockData?.week52Low} - ${selectedStockData?.week52High}</span></div>
+                  </div>
+                </div>
+
+                {/* Chart Controls */}
+                <div className="flex gap-2 flex-wrap mb-4">
+                  <div className="flex gap-2">
+                    <span className="text-sm text-slate-400 py-1">Type:</span>
+                    {['area', 'bar'].map(type => (
+                      <button
+                        key={type}
+                        onClick={() => setChartType(type)}
+                        className={`px-3 py-1 rounded text-sm font-semibold transition-all ${
+                          chartType === type
+                            ? 'bg-cyan-500 text-white'
+                            : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50'
+                        }`}
+                      >
+                        {type.charAt(0).toUpperCase() + type.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Main Chart */}
+                <div className="bg-slate-900/50 rounded-lg p-4 h-96">
+                  <ResponsiveContainer width="100%" height="100%">
+                    {chartType === 'area' ? (
+                      <AreaChart data={chartData}>
+                        <defs>
+                          <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                        <XAxis dataKey="time" stroke="#94a3b8" />
+                        <YAxis stroke="#94a3b8" />
+                        <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} />
+                        <Area type="monotone" dataKey="price" stroke="#06b6d4" fillOpacity={1} fill="url(#colorPrice)" />
+                      </AreaChart>
+                    ) : (
+                      <ComposedChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                        <XAxis dataKey="time" stroke="#94a3b8" />
+                        <YAxis stroke="#94a3b8" />
+                        <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} />
+                        <Bar dataKey="price" fill="#06b6d4" opacity={0.7} />
+                      </ComposedChart>
+                    )}
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Volume Chart */}
+                <div className="bg-slate-900/50 rounded-lg p-4 h-24 mt-4">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                      <XAxis dataKey="time" stroke="#94a3b8" hide />
+                      <YAxis stroke="#94a3b8" />
+                      <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} />
+                      <Bar dataKey="volume" fill="#8b5cf6" opacity={0.6} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Key Statistics Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { label: 'P/E Ratio', value: selectedStockData?.pe },
+                  { label: 'EPS', value: '$' + selectedStockData?.eps },
+                  { label: 'Dividend', value: selectedStockData?.dividend ? '$' + selectedStockData?.dividend : 'N/A' },
+                  { label: 'Avg Volume', value: (selectedStockData?.avgVolume / 1000000).toFixed(1) + 'M' },
+                ].map((stat, idx) => (
+                  <div key={idx} className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-xl p-4">
+                    <p className="text-slate-400 text-sm mb-1">{stat.label}</p>
+                    <p className="text-xl font-bold text-cyan-400">{stat.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Company Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-xl p-4">
+                  <p className="text-slate-400 text-sm mb-2 flex items-center gap-2"><Info size={16} /> Sector</p>
+                  <p className="text-lg font-bold">{selectedStockData?.sector}</p>
+                </div>
+                <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-xl p-4">
+                  <p className="text-slate-400 text-sm mb-2 flex items-center gap-2"><Info size={16} /> Industry</p>
+                  <p className="text-lg font-bold">{selectedStockData?.industry}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Sidebar */}
+            <div className="space-y-4">
+              {/* Search */}
+              <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-xl p-4">
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-3 text-slate-400" size={18} />
+                  <input
+                    type="text"
+                    placeholder="Cari..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-slate-700/50 border border-slate-600 rounded-lg pl-10 pr-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                {/* Filters */}
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-xs text-slate-400 mb-2">Sector</p>
+                    <select
+                      value={sector}
+                      onChange={(e) => setSector(e.target.value)}
+                      className="w-full bg-slate-700/50 border border-slate-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-cyan-500"
+                    >
+                      {sectors.map(s => (
+                        <option key={s} value={s}>{s === 'all' ? 'Semua Sector' : s}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400 mb-2">Range Harga: ${priceRange.min} - ${priceRange.max}</p>
+                    <input
+                      type="range"
+                      min="0"
+                      max="5000"
+                      step="100"
+                      value={priceRange.max}
+                      onChange={(e) => setPriceRange({ ...priceRange, max: parseInt(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Stock List */}
+              <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-xl overflow-hidden">
+                <div className="p-4 border-b border-slate-700/50">
+                  <h3 className="font-bold text-cyan-400 mb-3">MARKET MOVERS</h3>
+                  <div className="flex gap-2 flex-wrap">
+                    {['change', 'volume'].map(sort => (
+                      <button
+                        key={sort}
+                        onClick={() => setSortBy(sort)}
+                        className={`text-xs px-2 py-1 rounded transition-all ${
+                          sortBy === sort
+                            ? 'bg-cyan-500/30 text-cyan-400'
+                            : 'bg-slate-700/30 text-slate-400 hover:bg-slate-700/50'
+                        }`}
+                      >
+                        {sort === 'change' ? '% Chg' : 'Vol'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="max-h-[600px] overflow-y-auto">
+                  {filteredStocks.map(([symbol, stock]) => (
+                    <div
+                      key={symbol}
+                      onClick={() => setSelectedStock(symbol)}
+                      className={`p-4 border-b border-slate-700/30 cursor-pointer transition-all ${
+                        selectedStock === symbol
+                          ? 'bg-cyan-500/20 border-l-4 border-l-cyan-500'
+                          : 'hover:bg-slate-700/30'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <p className="font-bold">{symbol}</p>
+                          <p className="text-xs text-slate-400 truncate">{stock.name}</p>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleWatchlist(symbol);
+                          }}
+                          className="text-slate-400 hover:text-cyan-400"
+                        >
+                          {watchlist.includes(symbol) ? <Eye size={16} /> : <EyeOff size={16} />}
+                        </button>
+                      </div>
+                      <div className="flex items-end justify-between">
+                        <span className="text-base font-bold text-cyan-400">${stock.price}</span>
+                        <span className={`text-xs font-semibold ${stock.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {stock.change > 0 ? '+' : ''}{stock.change}%
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Buy Button */}
+              <button
+                onClick={() => setShowBuyModal(true)}
+                className="w-full bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white font-bold py-3 rounded-lg transition-all transform hover:scale-105"
+              >
+                BUY {selectedStock}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Portfolio Tab */}
+        {activeTab === 'portfolio' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-xl p-6">
+                <h2 className="text-2xl font-bold mb-6">Your Holdings</h2>
+                {Object.keys(portfolio).length === 0 ? (
+                  <div className="text-slate-400 text-center py-12">
+                    <TrendingUp className="mx-auto mb-4 opacity-50" size={48} />
+                    <p>Tidak ada holdings. Mulai trading!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {Object.entries(portfolio).map(([symbol, quantity]) => {
+                      const stock = stocks[symbol];
+                      const totalValue = stock.price * quantity;
+                      const boughtValue = orderHistory
+                        .filter(o => o.symbol === symbol && o.type === 'BUY')
+                        .reduce((sum, o) => sum + o.total, 0);
+                      const gain = totalValue - boughtValue;
+                      const gainPercent = ((gain / boughtValue) * 100).toFixed(2);
+
+                      return (
+                        <div key={symbol} className="bg-slate-700/30 rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <p className="font-bold text-lg">{symbol}</p>
+                              <p className="text-sm text-slate-400">{quantity} shares @ ${(boughtValue / quantity).toFixed(2)} avg</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-2xl font-bold text-cyan-400">${totalValue.toFixed(2)}</p>
+                              <p className={`text-sm font-semibold ${gain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {gain >= 0 ? '+' : ''}{gain.toFixed(2)} ({gainPercent}%)
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const sellQty = prompt(`Berapa shares yang dijual? (Max: ${quantity})`);
+                              if (sellQty && !isNaN(sellQty) && parseInt(sellQty) <= quantity) {
+                                const qty = parseInt(sellQty);
+                                const totalSaleValue = stock.price * qty;
+                                setBalance(balance + totalSaleValue);
+                                setPortfolio({
+                                  ...portfolio,
+                                  [symbol]: quantity - qty
+                                });
+                                setOrderHistory([
+                                  {
+                                    id: Date.now(),
+                                    symbol,
+                                    type: 'SELL',
+                                    quantity: qty,
+                                    price: stock.price,
+                                    total: totalSaleValue,
+                                    timestamp: new Date().toLocaleString(),
+                                    status: 'FILLED'
+                                  },
+                                  ...orderHistory
+                                ]);
+                              }
+                            }}
+                            className="text-red-400 hover:text-red-300 text-sm font-semibold"
+                          >
+                            Jual
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Summary Cards */}
+            <div className="space-y-4">
+              <div className="bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 rounded-xl p-6">
+                <p className="text-slate-400 text-sm mb-2">Total Portfolio Value</p>
+                <p className="text-3xl font-bold text-cyan-400">${(calculatePortfolioValue() + balance).toFixed(2)}</p>
+              </div>
+              <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-xl p-6">
+                <p className="text-slate-400 text-sm mb-2">Holdings Value</p>
+                <p className="text-2xl font-bold">${calculatePortfolioValue().toFixed(2)}</p>
+              </div>
+              <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-xl p-6">
+                <p className="text-slate-400 text-sm mb-2">Cash Available</p>
+                <p className="text-2xl font-bold text-green-400">${balance.toFixed(2)}</p>
+              </div>
+              <div className={`${calculateTotalGain() >= 0 ? 'bg-green-500/20 border-green-500/30' : 'bg-red-500/20 border-red-500/30'} border rounded-xl p-6`}>
+                <p className="text-slate-400 text-sm mb-2">Total Gain/Loss</p>
+                <p className={`text-2xl font-bold ${calculateTotalGain() >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {calculateTotalGain() >= 0 ? '+' : ''}{calculateTotalGain().toFixed(2)}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Watchlist Tab */}
+        {activeTab === 'watchlist' && (
+          <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-xl p-6">
+            <h2 className="text-2xl font-bold mb-6">Watchlist Saya</h2>
+            {watchlist.length === 0 ? (
+              <div className="text-slate-400 text-center py-12">
+                <Eye className="mx-auto mb-4 opacity-50" size={48} />
+                <p>Tidak ada items di watchlist.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {watchlist.map(symbol => {
+                  const stock = stocks[symbol];
+                  return (
+                    <div
+                      key={symbol}
+                      onClick={() => {
+                        setSelectedStock(symbol);
+                        setActiveTab('market');
+                      }}
+                      className="bg-slate-700/30 rounded-lg p-4 cursor-pointer hover:bg-slate-700/50 transition-all border border-slate-600/30 hover:border-cyan-500/50"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <p className="font-bold text-lg">{symbol}</p>
+                          <p className="text-xs text-slate-400">{stock.name}</p>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleWatchlist(symbol);
+                          }}
+                          className="text-cyan-400 hover:text-cyan-300"
+                        >
+                          <Eye size={18} />
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-end justify-between">
+                          <span className="text-2xl font-bold text-cyan-400">${stock.price}</span>
+                          <span className={`font-semibold text-sm ${stock.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {stock.change > 0 ? '+' : ''}{stock.change}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Screener Tab */}
+        {activeTab === 'screener' && (
+          <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-xl p-6">
+            <h2 className="text-2xl font-bold mb-6">Stock Screener</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-slate-700">
+                  <tr>
+                    <th className="text-left py-3 px-4 text-slate-400 font-semibold">Symbol</th>
+                    <th className="text-left py-3 px-4 text-slate-400 font-semibold">Name</th>
+                    <th className="text-right py-3 px-4 text-slate-400 font-semibold">Price</th>
+                    <th className="text-right py-3 px-4 text-slate-400 font-semibold">Change %</th>
+                    <th className="text-right py-3 px-4 text-slate-400 font-semibold">P/E</th>
+                    <th className="text-right py-3 px-4 text-slate-400 font-semibold">Dividend</th>
+                    <th className="text-left py-3 px-4 text-slate-400 font-semibold">Sector</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredStocks.slice(0, 20).map(([symbol, stock]) => (
+                    <tr key={symbol} className="border-b border-slate-700/30 hover:bg-slate-700/20 cursor-pointer"
+                      onClick={() => {
+                        setSelectedStock(symbol);
+                        setActiveTab('market');
+                      }}
+                    >
+                      <td className="py-3 px-4 font-bold text-cyan-400">{symbol}</td>
+                      <td className="py-3 px-4 text-slate-300">{stock.name}</td>
+                      <td className="text-right py-3 px-4 font-bold">${stock.price}</td>
+                      <td className={`text-right py-3 px-4 font-bold ${stock.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {stock.change > 0 ? '+' : ''}{stock.change}%
+                      </td>
+                      <td className="text-right py-3 px-4">{stock.pe}</td>
+                      <td className="text-right py-3 px-4">{stock.dividend || 'N/A'}</td>
+                      <td className="py-3 px-4">{stock.sector}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Orders Tab */}
+        {activeTab === 'orders' && (
+          <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-xl p-6">
+            <h2 className="text-2xl font-bold mb-6">Order History</h2>
+            {orderHistory.length === 0 ? (
+              <div className="text-slate-400 text-center py-12">
+                <Clock className="mx-auto mb-4 opacity-50" size={48} />
+                <p>Tidak ada orders.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-slate-700">
+                    <tr>
+                      <th className="text-left py-3 px-4 text-slate-400 font-semibold">Symbol</th>
+                      <th className="text-left py-3 px-4 text-slate-400 font-semibold">Type</th>
+                      <th className="text-right py-3 px-4 text-slate-400 font-semibold">Qty</th>
+                      <th className="text-right py-3 px-4 text-slate-400 font-semibold">Price</th>
+                      <th className="text-right py-3 px-4 text-slate-400 font-semibold">Total</th>
+                      <th className="text-left py-3 px-4 text-slate-400 font-semibold">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orderHistory.map(order => (
+                      <tr key={order.id} className="border-b border-slate-700/30 hover:bg-slate-700/20">
+                        <td className="py-3 px-4 font-bold">{order.symbol}</td>
+                        <td className="py-3 px-4">
+                          <span className={`px-3 py-1 rounded text-xs font-semibold ${
+                            order.type === 'BUY'
+                              ? 'bg-green-500/20 text-green-400'
+                              : 'bg-red-500/20 text-red-400'
+                          }`}>
+                            {order.type}
+                          </span>
+                        </td>
+                        <td className="text-right py-3 px-4">{order.quantity}</td>
+                        <td className="text-right py-3 px-4 text-cyan-400">${order.price}</td>
+                        <td className="text-right py-3 px-4 font-semibold">${order.total.toFixed(2)}</td>
+                        <td className="py-3 px-4 text-slate-400 text-xs">{order.timestamp}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Alerts Tab */}
+        {activeTab === 'alerts' && (
+          <div className="space-y-6">
+            <div className="flex gap-4">
+              <button
+                onClick={() => setShowAlertModal(true)}
+                className="bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white font-bold py-2 px-6 rounded-lg transition-all"
+              >
+                + Alert Baru
+              </button>
+            </div>
+
+            <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-xl p-6">
+              <h2 className="text-2xl font-bold mb-6">Price Alerts</h2>
+              {alerts.length === 0 ? (
+                <div className="text-slate-400 text-center py-12">
+                  <Bell className="mx-auto mb-4 opacity-50" size={48} />
+                  <p>Tidak ada alerts.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {alerts.map(alert => (
+                    <div key={alert.id} className="bg-slate-700/30 rounded-lg p-4 flex items-center justify-between">
+                      <div>
+                        <p className="font-bold text-lg">{alert.symbol}</p>
+                        <p className="text-sm text-slate-400">
+                          Alert ketika harga {alert.type === 'above' ? 'naik diatas' : 'turun dibawah'} ${alert.price}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setAlerts(alerts.filter(a => a.id !== alert.id))}
+                        className="text-red-400 hover:text-red-300 font-semibold"
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Buy Modal */}
+      {showBuyModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-md w-full p-8">
+            <h3 className="text-2xl font-bold mb-6">Beli {selectedStock}</h3>
+
+            <div className="space-y-6">
+              <div>
+                <p className="text-slate-400 text-sm mb-2">Market Price</p>
+                <p className="text-4xl font-bold text-cyan-400">${selectedStockData?.price}</p>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 text-sm mb-3">Order Type</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {['market', 'limit'].map(type => (
+                    <button
+                      key={type}
+                      onClick={() => setOrderType(type)}
+                      className={`px-3 py-2 rounded font-semibold text-sm transition-all ${
+                        orderType === type
+                          ? 'bg-cyan-500 text-white'
+                          : 'bg-slate-700/50 text-slate-300'
+                      }`}
+                    >
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {orderType === 'limit' && (
+                <div>
+                  <label className="block text-slate-400 text-sm mb-2">Limit Price</label>
+                  <input
+                    type="number"
+                    value={limitPrice}
+                    onChange={(e) => setLimitPrice(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-600 rounded px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-slate-400 text-sm mb-3">Quantity</label>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => setBuyQuantity(Math.max(1, buyQuantity - 1))}
+                    className="bg-slate-700/50 hover:bg-slate-700 p-2 rounded transition-all"
+                  >
+                    <Minus size={20} />
+                  </button>
+                  <input
+                    type="number"
+                    value={buyQuantity}
+                    onChange={(e) => setBuyQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="flex-1 bg-slate-800 border border-slate-600 rounded px-4 py-2 text-center font-bold text-white"
+                  />
+                  <button
+                    onClick={() => setBuyQuantity(buyQuantity + 1)}
+                    className="bg-slate-700/50 hover:bg-slate-700 p-2 rounded transition-all"
+                  >
+                    <Plus size={20} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-slate-800/50 rounded-lg p-4 space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Total Cost</span>
+                  <span className="font-bold text-cyan-400 text-lg">
+                    ${((orderType === 'limit' ? parseFloat(limitPrice) || selectedStockData?.price : selectedStockData?.price) * buyQuantity).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowBuyModal(false);
+                    setOrderType('market');
+                    setLimitPrice('');
+                  }}
+                  className="flex-1 bg-slate-700 hover:bg-slate-600 px-4 py-3 rounded-lg font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBuyStock}
+                  disabled={balance < (orderType === 'limit' ? parseFloat(limitPrice) || selectedStockData?.price : selectedStockData?.price) * buyQuantity}
+                  className="flex-1 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 disabled:from-slate-600 disabled:to-slate-600 text-white px-4 py-3 rounded-lg font-semibold"
+                >
+                  Place Order
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alert Modal */}
+      {showAlertModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-md w-full p-8">
+            <h3 className="text-2xl font-bold mb-6">Set Price Alert</h3>
+
+            <div className="space-y-6">
+              <div>
+                <label className="block text-slate-400 text-sm mb-2">Stock</label>
+                <p className="text-xl font-bold text-cyan-400">{selectedStock}</p>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 text-sm mb-3">Alert Type</label>
+                <div className="flex gap-2">
+                  {['above', 'below'].map(type => (
+                    <button
+                      key={type}
+                      onClick={() => setAlertType(type)}
+                      className={`flex-1 px-3 py-2 rounded font-semibold text-sm transition-all ${
+                        alertType === type
+                          ? 'bg-cyan-500 text-white'
+                          : 'bg-slate-700/50 text-slate-300'
+                      }`}
+                    >
+                      {type === 'above' ? '↑ Naik' : '↓ Turun'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 text-sm mb-2">Alert Price</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={alertPrice}
+                  onChange={(e) => setAlertPrice(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-600 rounded px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+                  placeholder="Enter price"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowAlertModal(false);
+                    setAlertPrice('');
+                  }}
+                  className="flex-1 bg-slate-700 hover:bg-slate-600 px-4 py-3 rounded-lg font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddAlert}
+                  className="flex-1 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white px-4 py-3 rounded-lg font-semibold"
+                >
+                  Set Alert
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
